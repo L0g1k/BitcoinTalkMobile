@@ -1,0 +1,7 @@
+- Give indication of current page, especially when opening to the last page
+- Add post [quote] style
+- Add child boards
+- Poster rankings
+- Reply link / Menu
+
+- Add sugar for YouTube links / Images

@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitcoin Talk Mobile</title>
+<link rel="stylesheet" href="themes/bitcointalk.min.css" />
+<link rel="stylesheet"
+	href="http://code.jquery.com/mobile/1.3.0/jquery.mobile.structure-1.3.0.min.css" />
+<script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+<script
+	src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"></script>
+<script>
+			// Listen for any attempts to call changePage().
+			$(document).bind( "pagebeforechange", function( e, data ) {
+			
+				// We only want to handle changePage() calls where the caller is
+				// asking us to load a page by URL.
+				if ( typeof data.toPage === "string" ) {
+			
+					// We are being asked to load a page by URL, but we only
+					// want to handle URLs that request the data for a specific
+					// category.
+					var u = $.mobile.path.parseUrl( data.toPage ),
+						re = /^#category-item/;
+			
+					if ( u.hash.search(re) !== -1 ) {
+						var topicId = u.hash.replace( /.*category=/, "" );
+						 $.ajax({
+					    	url: "http://localhost:8888/rest/api/topics/" + topicId,
+					    	success: function(obj){
+					    		showCategory( obj, u, data.options );
+					    		e.preventDefault();
+					    	},
+					    	error: error,
+					    	dataType: 'json'
+					    });
+						
+					}
+				}
+			});
+			
+			function error(error) {
+				$.mobile.loading( "show", {
+					text: "Error " + error.status,
+					textVisible: true,
+					theme: "a",
+					html: ""
+				});
+			}
+			
+			// Load the data for a specific category, based on
+// the URL passed in. Generate markup for the items in the
+// category, inject it into an embedded page, and then make
+// that page the current active page.
+function showCategory( topic, urlObj, options )
+{
+	var categoryName = urlObj.hash.replace( /.*category=/, "" ),
+
+		
+		pageSelector = urlObj.hash.replace( /\?.*$/, "" );
+	if ( topic ) {
+		// Get the page we are going to dump our content into.
+		var $page = $( pageSelector ),
+
+			// Get the header for the page.
+			$header = $page.children( ":jqmData(role=header)" ),
+
+			// Get the content area element for the page.
+			$content = $page.children( ":jqmData(role=content)" ),
+
+			// The markup we are going to inject into the content
+			// area of the page.
+			markup = "<p>" + topic.title + "</p><ul data-role='listview' data-inset='true'>",
+
+			// The array of items for this category.
+			cItems = topic.posts,
+
+			// The number of items in the category.
+			numItems = cItems.length;
+
+		// Generate a list item for each item in the category
+		// and add it to our markup.
+		for ( var i = 0; i < numItems; i++ ) {
+			markup += "<li>" + cItems[i].poster + "</li>";
+		}
+		markup += "</ul>";
+
+		// Find the h1 element in our header and inject the name of
+		// the category into it.
+		$header.find( "h1" ).html( topic.title );
+
+		// Inject the category items markup into the content element.
+		$content.html( markup );
+
+		// Pages are lazily enhanced. We call page() on the page
+		// element to make sure it is always enhanced before we
+		// attempt to enhance the listview markup we just injected.
+		// Subsequent calls to page() are ignored since a page/widget
+		// can only be enhanced once.
+		$page.page();
+
+		// Enhance the listview we just injected.
+		$content.find( ":jqmData(role=listview)" ).listview();
+
+		// We don't want the data-url of the page we just modified
+		// to be the url that shows up in the browser's location field,
+		// so set the dataUrl option to the URL for the category
+		// we just loaded.
+		options.dataUrl = urlObj.href;
+
+		// Now call changePage() and tell it to switch to
+		// the page we just modified.
+		$.mobile.changePage( $page, options );
+	}
+}
+</script>
+</head>
+<body>
+	<!-- Home -->
+	<div data-role="page" data-url="home">
+
+		<div data-role="header" data-position="fixed">
+			<a href="#" data-rel="back" data-icon="home">All boards</a>
+			<h1>Bitcoin</h1>
+			<a href="#" data-icon="bars">Menu</a>
+		</div>
+		<div data-theme="a">
+			<ul data-role="listview">
+				<li><a href="#category-items?category=145184">Bitcoin-Qt /
+						bitcoind version 0.8.0 released</a> <span class="ui-li-count">12</span>
+				</li>
+				<li><a href="#">Forum moderation policy</a> <span
+					class="ui-li-count">12</span></li>
+				<li><a href="#">New to Bitcoin? Start here!</a> <span
+					class="ui-li-count">12</span></li>
+				<li><a href="#">Upgrade bitcoin.org</a> <span
+					class="ui-li-count">12</span></li>
+				<li><a href="#">Important exchange Information, Currency
+						market Segments USD AU CHF etc</a> <span class="ui-li-count">12</span>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div id="category-items" data-role="page" data-url="category-items" tabindex="0" class="ui-page ui-body-c" style="min-height: 362px;">
+  <div data-role="header" class="ui-header ui-bar-a" role="banner"><h1 class="ui-title" role="heading" aria-level="1">Animals</h1></div>
+  <div data-role="content" class="ui-content" role="main"><p>All your favorites from aardvarks to zebras.</p><ul data-role="listview" data-inset="true" class="ui-listview ui-listview-inset ui-corner-all ui-shadow"><li class="ui-li ui-li-static ui-btn-up-c ui-corner-top">Pets</li><li class="ui-li ui-li-static ui-btn-up-c">Farm Animals</li><li class="ui-li ui-li-static ui-btn-up-c ui-corner-bottom ui-li-last">Wild Animals</li></ul></div>
+</div>
+</body>
+</html>

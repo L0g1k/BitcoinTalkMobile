@@ -1,0 +1,331 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitcoin Talk Mobile</title>
+<link rel="stylesheet" href="themes/bitcointalk.min.css" />
+<link rel="stylesheet"
+	href="http://code.jquery.com/mobile/1.2.0/jquery.mobile.structure-1.2.0.min.css" />
+<script src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+<script
+	src="http://code.jquery.com/mobile/1.2.0/jquery.mobile-1.2.0.min.js"></script>
+<style>
+.post {
+	width: 100%;
+	overflow: hidden
+}
+.child {
+	padding-left: 40px;
+}
+</style>
+<script>
+
+$( "#popupBasic" ).popup( "close");
+// Load the data for a specific board, based on
+// the URL passed in. Generate markup for the items in the
+// board, inject it into an embedded page, and then make
+// that page the current active page.
+function loadBoard( urlObj, options, url )
+{
+		$.mobile.loading( 'show', {
+			text: 'Loading',
+			textVisible: true,
+			theme: 'a',
+			html: ""
+		});
+		 $.ajax({
+	    	url: url,
+	    	success: function(obj, text, jqXHR){
+	    		$.mobile.loading( 'hide');
+	    		if(jqXHR.status == 202) {
+	    			notifyPendingScrape();
+	    		} else {
+	    			showBoard( obj, urlObj, options );
+	    		}
+	    	},
+	    	error: error,
+	    	dataType: 'json'
+	    });
+	    
+	   function error(error) {
+	   			$.mobile.loading( 'hide');
+				$( "#popupBasic" ).popup( "open", { history: false }).find("p").text(error.responseText);
+		}
+}
+
+function showBoard(board, urlObj, options ) {
+
+	var pageSelector = urlObj.hash.replace( /\?.*$/, "" );
+		
+	if ( board ) {
+	
+		// Get the page we are going to dump our content into.
+		var $page = $( pageSelector ),
+		// Get the content area element for the page.
+		$content = $page.children( ":jqmData(role=content)" ),
+		$header = $page.children( ":jqmData(role=header)" );
+		
+		var markup;
+		
+		switch(pageSelector) {
+			case '#boards': markup = renderBoard(board, $page, $content); break;
+			case '#topics': markup = renderTopic(board, $page, $content); break;
+		}
+			
+		// Enhance the listview we just injected.
+		$content.find( ":jqmData(role=listview)" ).listview();
+		
+		$header.removeClass("ui-fixed-hidden");
+		// We don't want the data-url of the page we just modified
+		// to be the url that shows up in the browser's location field,
+		// so set the dataUrl option to the URL for the board
+		// we just loaded.
+		options.dataUrl = urlObj.href;
+	
+		// Now call changePage() and tell it to switch to
+		// the page we just modified.
+		$.mobile.changePage( $page, options );
+	}
+	
+	function renderBoard(board, $page, $content) {
+		var $header = $page.children( ":jqmData(role=header)" ),
+		
+		markup = "<ul data-role='listview'>",
+		topics = board.topics,
+
+		// The number of items in the board.
+		numItems = topics.length;
+
+		// Generate a list item for each item in the board
+		// and add it to our markup.
+		for ( var i = 0; i < numItems; i++ ) {
+			var topic = topics[i];
+			markup += '<li><a href="#topics?topicId=' + topic.topicId + '">' + topic.title + '</a><span class="ui-li-count">' + topic.postCount + "</span></li>";
+		}
+		markup += "</ul>";
+		
+		// Inject the board items markup into the content element.
+		$content.html( markup );
+		$page.page();
+		// Find the h1 element in our header and inject the name of
+		// the board into it.
+		$header.find( "h1" ).html( board.title );
+		
+		return markup;
+	}
+	
+	function renderTopic(topic, $page, $content) {
+		var $header = $page.children( ":jqmData(role=header)" ),
+		
+		markup = "<ul data-role='listview' data-inset='true'>";
+		posts = topic.requestedPage.posts,
+		
+		// The number of items in the board.
+		numItems = posts.length,
+		numPages = topic.numberPages;
+
+		for ( var i = 0; i < numItems; i++ ) {
+			var post = posts[i];
+			markup += '<li data-role="list-divider">' + post.poster + '</li>';
+			markup += '<li><div class="post">' + post.content + '</div></li>';
+		}
+		markup += "</ul>";
+		
+		// Inject the board items markup into the content element.
+		$content.html( markup );
+		
+		// Find the h1 element in our header and inject the name of
+		// the board into it.
+		$header.find( "h1" ).html( topic.title );
+		if($header.data("init") == false) {
+			$header.data("init", true);
+			$header.find( "#back" ).text( topic.parentBoardName ).attr( "href", "#boards?boardId=" + topic.parentBoardId );
+		}
+		$page.page();
+		
+		$('#page-back').css("opacity", topic.previousPageLink != -1 ? 1 : 0.5)
+			.attr("href", topic.previousPageLink != -1 ? "/#topics?topicId=" + topic.topicId + "&pageId=" + topic.previousPageLink : "javascript:");
+		
+		$('#page-next').css("opacity", topic.nextPageLink != -1 ? 1 : 0.5)
+			.attr("href", topic.nextPageLink != -1 ? "/#topics?topicId=" + topic.topicId + "&pageId=" + topic.nextPageLink : "javascript:");
+	
+		
+		
+	
+		return markup;
+	}
+}
+
+var isFirstLoad = true;
+var firstURL;
+var u;
+// Listen for any attempts to call changePage().
+$(document).bind( "pagebeforechange", function( e, data ) {
+	//var base = "http://192.168.1.105:8888/rest/api/";
+	var base = "http://bitcointalkapi.appspot.com/rest/api/";
+	// We only want to handle changePage() calls where the caller is
+	// asking us to load a page by URL.
+	if (isFirstLoad == true) {
+        isFirstLoad = false;
+        u = $.mobile.path.parseUrl( window.location.href );
+        load(u, data, e);
+    } else if ( typeof data.toPage === "string") {
+        u = $.mobile.path.parseUrl( data.toPage );
+        load(u, data, e);
+    }
+	function getUrlVar(hash, key){
+		var result = new RegExp(key + "=([^&]*)", "i").exec(hash); 
+		return result && result[1] || ""; 
+	}
+	
+	function load(u, data, e) {
+	 	// We are being asked to load a page by URL, but we only
+		// want to handle URLs that request the data for a specific
+		// board.
+		var hash = u.hash;
+		var path;
+		var found = false;
+		if(hash.search(/^#topic/) !== -1) {
+			found = true;
+			var topicId = getUrlVar(hash, "topicId");
+			var pageId = getUrlVar(hash, "pageId");
+			path = "topics/" + topicId;
+			if(pageId != "") {
+				path += "?pageId=" + pageId;
+			}
+		} else if(hash.search(/^#boards/) !== -1) {
+			found = true;
+			var boardId = getUrlVar(hash, "boardId");
+			path = "boards/" + boardId;
+		}
+		
+		if ( found ) {
+			// We're being asked to display the items for a specific board.
+			// Call our internal method that builds the content for the board
+			// on the fly based on our in-memory board data structure.
+			//var id = u.hash.replace( match.t, "" );
+			loadBoard( u, data.options, base + path);
+
+			// Make sure to tell changePage() we've handled this call so it doesn't
+			// have to do anything.
+			e.preventDefault();
+		}	
+	}
+});
+
+
+</script>
+</head>
+
+<body>
+	<div id="home" data-role="page">
+
+		<div data-role="header">
+			<h1>Bitcoin Forum</h1>
+		</div>
+		<div data-role="content">
+			<ul data-role="listview" data-inset="true" data-divider-theme="a" data-split-theme="a">
+				<li data-role="list-divider">Bitcoin</li>
+				<li><a href="#boards?boardId=1">Bitcoin Discussion</a></li>
+				<!--<li class="child"><a href="#boards?boardId=1">Legal</a></li>
+				<li class="child"><a href="#boards?boardId=1">Press</a></li>
+				<li class="child"><a href="#boards?boardId=1">Meetups</a></li>
+				<li class="child"><a href="#boards?boardId=1">Important Annoucements</a></li>-->
+				<li><a href="#boards?boardId=6">Development &amp; Technical Discussion</a></li>
+				<li><a href="#boards?boardId=14">Mining</a>
+				</li>
+				<li><a href="#boards?boardId=4">Technical Support</a>
+				</li>
+				<li><a href="#boards?boardId=12">Project Development</a>
+				</li>
+				<li data-role="list-divider">Economy</li>
+				<li><a href="#boards?boardId=7">Economics</a>
+				</li>
+				<li><a href="#boards?boardId=5">Marketplace</a>
+				</li>
+				<li><a href="#boards?boardId=8">Trading Discussion</a>
+				</li>
+				<li data-role="list-divider">Other</li>
+				<li><a href="#boards?boardId=24">Meta</a>
+				</li>
+				<li><a href="#boards?boardId=39">Newbies</a>
+				</li>
+				<li><a href="#boards?boardId=34">Politics &amp; Society</a>
+				</li>
+				<li><a href="#boards?boardId=9">Off-topic</a>
+				</li>
+				<li><a href="#boards?boardId=67">Alternate cryptocurrencies</a>
+				</li>
+				<li><a href="#boards?boardId=59">Archival</a>
+				</li>
+				<li data-role="list-divider">Local</li>
+				<li><a href="#boards?boardId=24">Español (Spanish)</a>
+				</li>
+				<li><a href="#boards?boardId=39">中文 (Chinese)</a>
+				</li>
+				<li><a href="#boards?boardId=34">Deutsch (German)</a>
+				</li>
+				<li><a href="#boards?boardId=9">עברית (Hebrew)</a>
+				</li>
+				<li><a href="#boards?boardId=67">Français (French)</a>
+				</li>
+				<li><a href="#boards?boardId=59">India</a>
+				</li>
+				<li><a href="#boards?boardId=28">Italiano (Italian)</a>
+				</li>
+				<li><a href="#boards?boardId=79">Nederlands (Dutch)</a>
+				</li>
+				<li><a href="#boards?boardId=82">한국어 (Korean)</a>
+				</li>
+				<li><a href="#boards?boardId=29">Português (Portuguese)</a>
+				</li>
+				<li><a href="#boards?boardId=10">Русский (Russian)</a>
+				</li>
+				<li><a href="#boards?boardId=45">Skandinavisk</a>
+				</li>
+				<li><a href="#boards?boardId=11">Other</a>
+				</li>
+			</ul>
+		</div>
+
+	</div>
+	<div id="boards" data-role="page" data-theme="a">
+		<div data-role="header" data-position="fixed">
+			<a href="/" data-icon="back">All boards</a>
+			<h1>Bitcoin</h1>
+			<a href="#" data-icon="bars">Menu</a>
+		</div>
+		<div data-role="popup" id="popupBasic" data-theme="a"
+			data-dismissible="true" style="max-width: 400px;">
+			<div data-role="header" data-theme="a" class="ui-corner-top">
+				<h1>Oops</h1>
+			</div>
+			<div data-role="content" data-theme="a"
+				class="ui-corner-bottom ui-content">
+				<p></p>
+				<a href="#" data-role="button" data-inline="true"
+					class="ui-corner-right" data-rel="back" data-theme="a">Ok</a>
+			</div>
+		</div>
+		<div data-role="content"></div>
+	</div>
+	<div id="topics" data-role="page" data-theme="a">
+		<div data-role="header" data-position="fixed" data-init="false">
+			<a id="back" href="#" data-icon="back">Parent</a>
+			<h1>Bitcoin</h1>
+			<form data-role="controlgroup"
+				style="position: absolute; top: 0; right: 5px;"
+				data-type="horizontal" data-mini="true">
+				<a rel="external" id="page-back" href="#" data-role="button" data-mini="true"
+					data-icon="arrow-l" data-iconpos="notext"></a>
+				<a rel="external" id="page-next" href="#"
+					data-role="button" data-mini="true" data-icon="arrow-r"
+					data-iconpos="notext"/></a>
+			</form>
+		</div>
+		<div data-role="content"></div>
+
+	</div>
+</body>
+</html>
